@@ -24,7 +24,7 @@ class WebSocketTerminal(
     val outputLine = StringBuilder()
 
     fun connect() {
-        Log.i("WebSocketTerminal", "Try connect to ${Config.address}")
+        Log.i("WebSocketTerminal", "Соединяюсь с ${Config.address}")
         val client = OkHttpClient()
         val request = Request.Builder()
             .url(Config.address)
@@ -47,7 +47,7 @@ class WebSocketTerminal(
         Log.i(TAG, "✅ Соединение открыто")
         networkInfo = NetworkInfo()
         deviceInfo = networkInfo.getInfo()
-        send("--- BEGIN ---\n")
+        send("--- SHELL INFO ---\n")
         send("MAC:${deviceInfo[DeviceInfo.MAC_KEY]}\n")
         send("IP:${deviceInfo[DeviceInfo.IP_KEY]}\n")
         send("PROMPT:${deviceInfo[DeviceInfo.PROMPT_KEY]}\n")
@@ -57,13 +57,12 @@ class WebSocketTerminal(
     }
 
     override fun onMessage(webSocket: WebSocket, text: String) {
-        Log.i(TAG, "📨 Получено текстовое сообщение: $text")
-        send(text)
-        shell?.execSuShell(text)
+        shell?.sendToShell(text)
     }
 
     override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-        Log.i(TAG, "📦 Получены байты: ${bytes.hex()}")
+//        Log.i(TAG, "📦 Получены байты: ${bytes.hex()}")
+        shell?.sendToShell(bytes.toString())
     }
 
     override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
@@ -76,7 +75,6 @@ class WebSocketTerminal(
 
     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
         Log.i(TAG, "❌ Ошибка: ${t.message}")
-        webSocket.close(1000, null)
         shell?.kill()
         shell = null
         connected = false
@@ -89,10 +87,11 @@ class WebSocketTerminal(
                 context.contentResolver.query(PROVIDER_URI, projection, null, null, null)
             cursor?.let {
                 val colValue = it.getColumnIndex(COLUMN_VALUE)
-                if (colValue < 0)
-                    throw IllegalStateException("В ответе от content provider MS Vision не найден столбец \"$COLUMN_VALUE\"")
-                it.moveToFirst()
-                return it.getString(colValue)
+                if (colValue >= 0) {
+                    it.moveToFirst()
+                    return it.getString(colValue)
+                } else
+                    return null
             } ?: return null
         } catch (th: Throwable) {
             return null

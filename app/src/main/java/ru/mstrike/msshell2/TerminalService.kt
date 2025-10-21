@@ -11,31 +11,41 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class TerminalService : Service() {
 
-    var serviceScope: Job? = null
     var canceled = false
 
     lateinit var webSocketTerminal: WebSocketTerminal
+    private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground()
-        serviceScope = GlobalScope.launch {
-            webSocketTerminal =
-                WebSocketTerminal(applicationContext, (applicationContext as Application).optionsStorage)
-            while (!canceled) {
-                if (!webSocketTerminal.connected) {
-                    webSocketTerminal.connect()
-                    execute()
+        serviceScope.launch {
+            try {
+                isRunning = true
+                webSocketTerminal =
+                    WebSocketTerminal(
+                        applicationContext,
+                        (applicationContext as Application).optionsStorage
+                    )
+                while (!canceled) {
+                    if (!webSocketTerminal.connected) {
+                        webSocketTerminal.connect()
+                        execute()
+                    }
+                    delay(5000)
                 }
-                delay(5000)
+            } catch (th: Throwable) {
+
             }
         }
+        isRunning = false
         return START_STICKY
     }
 
@@ -48,8 +58,6 @@ class TerminalService : Service() {
     }
 
     private fun startForeground() {
-//        val dataPermission =
-//            PermissionChecker.checkSelfPermission(this, android.p.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION)
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
@@ -78,7 +86,8 @@ class TerminalService : Service() {
     }
 
     companion object {
-        const val CHANNEL_ID = "Ms adminer 2"
+        const val CHANNEL_ID = "MS Shell 2"
+        var isRunning = false
 
         @JvmStatic
         fun start(context: Context) {

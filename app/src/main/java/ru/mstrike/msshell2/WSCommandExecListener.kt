@@ -12,7 +12,6 @@ class WSCommandExecListener(
     }
 
     override fun onExit(code: Int) {
-//        if (code != 0)
-            terminal.send("exit code:$code")
+        if (code != 0) terminal.send("exit code:$code")
     }
 }

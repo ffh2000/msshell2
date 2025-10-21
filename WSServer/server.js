@@ -27,10 +27,5 @@ wsMSShellServer.on('connection', (ws) => {
         console.log('❌ Клиент отключился');
     });
 
-    ws.send('ls -1 -l --color');
-    ws.send('\n');
-    // ws.send('sh\n');
-    // Отправляем приветственное сообщение
-    // ws.send('Привет! Вы подключились к WebSocket серверу.');
-    ws.send('exit\n');
+    // ws.send('ls -1 -l --color\n');
 });

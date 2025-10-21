@@ -1,11 +1,10 @@
 package ru.mstrike.msshell2
 
-import android.util.Log
-import ru.mstrike.msshell2.WebSocketTerminal.Companion.TAG
 import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.InputStreamReader
 import java.io.InterruptedIOException
+import java.io.Reader
 import java.util.concurrent.TimeUnit
 
 class Shell(
@@ -23,75 +22,29 @@ class Shell(
             outputStream = DataOutputStream(process.outputStream)
             var reader = BufferedReader(InputStreamReader(process.inputStream))
             var errorReader = BufferedReader(InputStreamReader(process.errorStream))
-            outputStreamThread = Thread({
-                try {
-                    reader.use {
-                        var ch: Int = it.read()
-                        while (ch != -1 && !Thread.currentThread().isInterrupted) {
-                            listener.onOutput(ch.toChar().toString())
-                            ch = it.read()
-                        }
-                    }
-                } catch (e: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    Log.i(TAG, "❌ Поток outputStreamThread: ${Thread.currentThread()} прерван.")
-                    reader.close()
-                } catch (e: InterruptedIOException) {
-                    Thread.currentThread().interrupt()
-                    Log.i(TAG, "❌ Поток outputStreamThread: ${Thread.currentThread()} прерван.")
-                    reader.close()
-                }
-            }, "outputStreamThread")
-            outputErrorStreamThread = Thread({
-                try {
-                    errorReader.use {
-                        var ch: Int = it.read()
-                        while (ch != -1 && !Thread.currentThread().isInterrupted) {
-                            listener.onErrorOutput(ch.toChar().toString())
-                            ch = it.read()
-                        }
-                    }
-                } catch (e: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    Log.i(
-                        TAG,
-                        "❌ Поток outputErrorStreamThread: ${Thread.currentThread()} прерван."
-                    )
-                    errorReader.close()
-                } catch (e: InterruptedIOException) {
-                    Thread.currentThread().interrupt()
-                    Log.i(TAG, "❌ Поток outputStreamThread: ${Thread.currentThread()} прерван.")
-                    errorReader.close()
-                }
-            }, "outputErrorStreamThread")
+            outputStreamThread = createOutputStreamThread(reader)
+            outputErrorStreamThread = createOutputErrorStreamThread(errorReader)
             outputStreamThread.start()
             outputErrorStreamThread.start()
-//            outputStream.writeBytes("exit\n")
-//            outputStream.flush()
             try {
                 process.waitFor()
                 outputStreamThread.join()
                 outputErrorStreamThread.join()
             } catch (e: InterruptedException) {
-                Log.i(TAG, "❌ Поток shellTread: ${Thread.currentThread()} прерван.")
                 Thread.currentThread().interrupt()
             } catch (e: Throwable) {
-                Log.i(TAG, "❌ Поток shellTread: неизвестная ошибка: ${e.message}")
                 Thread.currentThread().interrupt()
+            }
+            if (process.isAlive) {
+                process.destroyForcibly() // Гарантированно завершает процесс
+                try {
+                    process.waitFor(500, TimeUnit.MILLISECONDS) // Подождать завершения
+                } catch (e: Throwable) {
+                }
             }
             outputStreamThread.interrupt()
             outputErrorStreamThread.interrupt()
-            process?.let { process ->
-                if (process.isAlive()) {
-                    process.destroyForcibly() // Гарантированно завершает процесс
-                    try {
-                        process.waitFor(500, TimeUnit.MILLISECONDS) // Подождать завершения
-                    } catch (e: Throwable) {
-                    }
-                }
-            }
             this@Shell.process = null
-            Log.i(TAG, "❌ Поток shellTread: завершил работу")
         }
     }, "shellTread")
 
@@ -100,14 +53,61 @@ class Shell(
     }
 
     /**
-     * В конце команды надо дописывать "&& exit\n" иначе не произойдет выхода из процесса
-     * и подвиснет навсегда.
+     * Создает поток (нить), обслуживающий поток вывода в консоль.
      */
-    fun execSuShell(command: String) {
+    private fun createOutputStreamThread(reader: Reader): Thread {
+        return Thread({
+            try {
+                reader.use {
+                    var ch: Int = it.read()
+                    while (ch != -1 && !Thread.currentThread().isInterrupted) {
+                        listener.onOutput(ch.toChar().toString())
+                        ch = it.read()
+                    }
+                }
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                reader.close()
+            } catch (e: InterruptedIOException) {
+                Thread.currentThread().interrupt()
+                reader.close()
+            }
+        }, "outputStreamThread")
+    }
+
+    private fun createOutputErrorStreamThread(errorReader: Reader): Thread {
+        return Thread({
+            try {
+                errorReader.use {
+                    var ch: Int = it.read()
+                    while (ch != -1 && !Thread.currentThread().isInterrupted) {
+                        listener.onErrorOutput(ch.toChar().toString())
+                        ch = it.read()
+                    }
+                }
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                errorReader.close()
+            } catch (e: InterruptedIOException) {
+                Thread.currentThread().interrupt()
+                errorReader.close()
+            }
+        }, "outputErrorStreamThread")
+    }
+
+    /**
+     * Пришедший символ или строку направляет в поток ввода процесса
+     */
+    fun sendToShell(command: String) {
         outputStream?.writeBytes(command)
         outputStream?.flush()
     }
 
+    /**
+     * Останавливает текущую консоль.
+     *
+     * После этого ее надо пересоздавать. Восставноить работу нельзя. т.е. это деструктор.
+     */
     fun kill() {
         shellTread.interrupt()
     }

@@ -11,6 +11,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        RestartWorker.start(this)
         GlobalScope.launch(Dispatchers.IO) {
             init()
             TerminalService.start(this@MainActivity)
