@@ -27,13 +27,13 @@ class TerminalService : Service() {
         startForeground()
         serviceScope = GlobalScope.launch {
             webSocketTerminal =
-                WebSocketTerminal((applicationContext as Application).optionsStorage)
+                WebSocketTerminal(applicationContext, (applicationContext as Application).optionsStorage)
             while (!canceled) {
                 if (!webSocketTerminal.connected) {
                     webSocketTerminal.connect()
                     execute()
                 }
-                delay(10000)
+                delay(5000)
             }
         }
         return START_STICKY
