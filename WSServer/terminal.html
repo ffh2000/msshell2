@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANSI Output to HTML</title>
+    <style>
+        .ansi {
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+<div id="output" class="ansi" style="width: 800px; height: 600px;background-color: black;"></div>
+
+<script>
+    // ANSI escape sequences to CSS color mapping
+    const ansiColors = {
+        30: "black",
+        31: "red",
+        32: "green",
+        33: "yellow",
+        34: "blue",
+        35: "magenta",
+        36: "cyan",
+        37: "white",
+        90: "brightBlack",
+        91: "brightRed",
+        92: "brightGreen",
+        93: "brightYellow",
+        94: "brightBlue",
+        95: "brightMagenta",
+        96: "brightCyan",
+        97: "brightWhite"
+    };
+
+    // Функция для преобразования ANSI-кодов в HTML
+    function ansiToHtml(input) {
+        const regex = /\x1b\[(\d+)(?:;(\d+))?m/g;
+        let output = input;
+        output = output.replace(regex, (match, p1, p2) => {
+            const colorCode = parseInt(p1, 10);
+            if (ansiColors[colorCode]) {
+                return `<span style="color: ${ansiColors[colorCode]}">`;
+            } else {
+                return match;
+            }
+        });
+        output = output.replace(/\x1b\[0m/g, '</span>'); // Закрытие тега после каждого цвета
+        return output;
+    }
+
+    // Пример вывода ANSI строк
+    const ansiString = "\x1b[31mThis is red\x1b[0m and \x1b[32mthis is green\x1b[0m!";
+
+    // Преобразование ANSI в HTML и вывод на страницу
+    document.getElementById('output').innerHTML = ansiToHtml(ansiString);
+</script>
+</body>
+</html>

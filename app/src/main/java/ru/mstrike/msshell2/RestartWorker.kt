@@ -7,6 +7,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import ru.mstrike.msshell2.WebSocketTerminal.Companion.TAG
 import java.util.concurrent.TimeUnit
 
 /**
@@ -23,9 +24,9 @@ class RestartWorker constructor(
 
     override fun doWork(): Result {
         try {
-            Log.d("ForegroundService", "RestartWorker.doWork: проверяю что бы сервис работал")
+            Log.d(WebSocketTerminal.TAG, "✅ RestartWorker.doWork: проверяю что бы сервис работал.")
             if (!TerminalService.isRunning) {
-                Log.d("ForegroundService", "RestartWorker.doWork: Сервис не работает, запускаю")
+                Log.d(WebSocketTerminal.TAG, "⚠️ Сервис не работает, запускаю")
                 TerminalService.start(context) //не знаю, сработает ли. Должен по идее.
 //Вариант старта через MainActivity. Экран будет мигать
 //                val options = ActivityOptions.makeBasic()
@@ -37,6 +38,7 @@ class RestartWorker constructor(
 //                    context.startActivity(launchIntent, options.toBundle())
 //                }
             }
+            Log.d(WebSocketTerminal.TAG, "✅ TerminalService работает, ничего делать не надо.")
         } finally {
         }
         return Result.success()

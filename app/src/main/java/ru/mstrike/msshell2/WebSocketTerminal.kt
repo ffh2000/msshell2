@@ -24,7 +24,7 @@ class WebSocketTerminal(
     val outputLine = StringBuilder()
 
     fun connect() {
-        Log.i("WebSocketTerminal", "Соединяюсь с ${Config.address}")
+        Log.i(WebSocketTerminal.TAG, "Соединяюсь с ${Config.address}")
         val client = OkHttpClient()
         val request = Request.Builder()
             .url(Config.address)
@@ -99,7 +99,7 @@ class WebSocketTerminal(
     }
 
     companion object {
-        const val TAG = "WebSocketTerminal"
+        const val TAG = "MSShell2"
         val PROVIDER_URI = Uri.parse("content://ru.mstrike.msvision.options")
         val COLUMN_VALUE = "value"
     }

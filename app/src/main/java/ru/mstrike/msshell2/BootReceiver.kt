@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 
 /**
  * Слушатель для системных сообщений на автозагрузку
@@ -26,5 +27,6 @@ class BootReceiver : BroadcastReceiver() {
         val i = Intent(context, MainActivity::class.java)
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(i)
+        Log.d(WebSocketTerminal.TAG, "✅ Автостарт после загрузки устройства.")
     }
 }
