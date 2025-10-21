@@ -11,8 +11,41 @@
         }
     </style>
 </head>
+
+<script>
+    var ws;
+
+    window.onload = function () {
+        ws = new WebSocket('ws://10.105.0.79:8081');
+        ws.onopen = function (event) {
+            console.log('Соединение установлено:', event);
+            // Можно отправить сообщение на сервер
+            ws.send('ls\n');
+        };
+
+        // Событие, которое срабатывает при получении сообщения от сервера
+        ws.onmessage = function (event) {
+            console.log(event.data);
+        };
+
+        // Событие, которое срабатывает при ошибке
+        ws.onerror = function (error) {
+            console.log('Ошибка WebSocket:', error);
+        };
+
+        // Событие, которое срабатывает при закрытии соединения
+        ws.onclose = function (event) {
+            console.log('Соединение закрыто:', event);
+        };
+    }
+</script>
+
 <body>
-<div id="output" class="ansi" style="width: 800px; height: 600px;background-color: black;"></div>
+<div id="output" class="ansi" style="width: 800px; height: 600px;background-color: black;">
+
+</div>
+<input id="command_line" type="text">
+<button id="send_command">Run</button>
 
 <script>
     // ANSI escape sequences to CSS color mapping

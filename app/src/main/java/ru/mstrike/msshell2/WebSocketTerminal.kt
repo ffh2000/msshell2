@@ -57,6 +57,7 @@ class WebSocketTerminal(
     }
 
     override fun onMessage(webSocket: WebSocket, text: String) {
+        Log.i(TAG, text)
         shell?.sendToShell(text)
     }
 
