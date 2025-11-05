@@ -9,6 +9,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
+import java.util.StringTokenizer
 
 class WebSocketTerminal(
     val context: Context,
@@ -24,7 +25,7 @@ class WebSocketTerminal(
     val outputLine = StringBuilder()
 
     fun connect() {
-        Log.i(WebSocketTerminal.TAG, "Соединяюсь с ${Config.address}")
+//        Log.i(WebSocketTerminal.TAG, "Соединяюсь с ${Config.address}")
         val client = OkHttpClient()
         val request = Request.Builder()
             .url(Config.address)
@@ -44,30 +45,22 @@ class WebSocketTerminal(
     override fun onOpen(webSocket: WebSocket, response: Response) {
         connected = true
         shell = Shell(wsCommandExecListener)
-        Log.i(TAG, "✅ Соединение открыто")
-        networkInfo = NetworkInfo()
-        deviceInfo = networkInfo.getInfo()
-        send("--- SHELL INFO ---\n")
-        send("MAC:${deviceInfo[DeviceInfo.MAC_KEY]}\n")
-        send("IP:${deviceInfo[DeviceInfo.IP_KEY]}\n")
-        send("PROMPT:${deviceInfo[DeviceInfo.PROMPT_KEY]}\n")
-        send("MSSHELL2_UUID:${optionsStorage.uuid}\n")
-        send("PANEL_ID:${getMSVisionOption(MSVisionOption.CODE)}\n")
-        send("--- END ---\n")
+//        Log.i(TAG, "✅ Соединение открыто")
     }
 
     override fun onMessage(webSocket: WebSocket, text: String) {
-        Log.i(TAG, text)
-        shell?.sendToShell(text)
+//        Log.i(TAG, text)
+        Log.d(TAG, "onMessage: $text")
+        parseText(text)
     }
 
     override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
 //        Log.i(TAG, "📦 Получены байты: ${bytes.hex()}")
-        shell?.sendToShell(bytes.toString())
+//        shell?.sendToShell(bytes.toString())
     }
 
     override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-        Log.i(TAG, "⚠️ Закрывается: $code / $reason")
+//        Log.i(TAG, "⚠️ Закрывается: $code / $reason")
         webSocket.close(1000, null)
         shell?.kill()
         shell = null
@@ -75,7 +68,7 @@ class WebSocketTerminal(
     }
 
     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-        Log.i(TAG, "❌ Ошибка: ${t.message}")
+//        Log.i(TAG, "❌ Ошибка: ${t.message}")
         shell?.kill()
         shell = null
         connected = false
@@ -97,6 +90,25 @@ class WebSocketTerminal(
         } catch (th: Throwable) {
             return null
         }
+    }
+
+    private fun parseText(text: String) {
+        val tk = StringTokenizer(text, " \n")
+        val command = tk.nextToken()
+        when (command) {
+            "_info" -> sendInfo()
+            else -> shell?.sendToShell(text)
+        }
+    }
+
+    private fun sendInfo() {
+        networkInfo = NetworkInfo()
+        deviceInfo = networkInfo.getInfo()
+        send("MAC:${deviceInfo[DeviceInfo.MAC_KEY]}\n")
+        send("IP:${deviceInfo[DeviceInfo.IP_KEY]}\n")
+        send("PROMPT:${deviceInfo[DeviceInfo.PROMPT_KEY]}\n")
+        send("MSSHELL2_UUID:${optionsStorage.uuid}\n")
+        send("PANEL_ID:${getMSVisionOption(MSVisionOption.CODE)}\n")
     }
 
     companion object {
