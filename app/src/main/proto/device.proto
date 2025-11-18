@@ -1,0 +1,194 @@
+syntax = "proto3";
+
+package device;
+
+option go_package = "device-control-service/pkg/device_v1";
+
+import "google/protobuf/timestamp.proto";
+
+service DeviceService {
+  // Device stream для двусторонней связи
+  rpc DeviceStream(stream DeviceMessage) returns (stream DeviceMessage);
+  
+  // HTTP-like методы для управления
+  rpc SendCommand(CommandRequest) returns (CommandResponse);
+  rpc BroadcastCommand(BroadcastRequest) returns (BroadcastResponse);
+  rpc GetDevices(GetDevicesRequest) returns (GetDevicesResponse);
+  rpc GetDeviceInfo(DeviceInfoRequest) returns (DeviceInfoResponse);
+  rpc GetDeviceLogs(DeviceLogsRequest) returns (DeviceLogsResponse);
+}
+
+message DeviceMessage {
+  string message_id = 1;
+  string device_id = 2;
+  MessageType type = 3;
+  bytes data = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  string session_id = 6; // For shell sessions and multi-session commands
+  
+  // MAC address - REQUIRED in the first message (DEVICE_INFO) to identify device
+  // Used as primary device identifier on backend
+  // If empty, backend will generate fallback ID (for testing only)
+  string mac_address = 7;
+}
+
+enum MessageType {
+  UNKNOWN = 0;
+  DEVICE_INFO = 1;
+  COMMAND = 2;
+  COMMAND_RESULT = 3;
+  PING = 4;
+  PONG = 5;
+  LOGS = 6;
+  ERROR = 7;
+  SHELL_START = 8;    // Request to start shell session
+  SHELL_INPUT = 9;    // Input data from client to device shell
+  SHELL_OUTPUT = 10;  // Output data from device shell to client
+  SHELL_RESIZE = 11;  // Terminal resize event
+  SHELL_EXIT = 12;    // Shell session terminated
+}
+
+message DeviceInfo {
+  string device_id = 1;
+  string platform = 2;
+  string model = 3;
+  string version = 4;
+  string manufacturer = 5;
+  string app_version = 6;
+  string ip_address = 7;
+  bool is_online = 8;
+  google.protobuf.Timestamp last_seen = 9;
+  google.protobuf.Timestamp created_at = 10;
+  
+  // MAC address - hardware-based unique identifier
+  // Used as primary device key on backend
+  string mac_address = 11;
+}
+
+message CommandRequest {
+  string device_id = 1;
+  string command = 2;
+  map<string, string> parameters = 3;
+  int32 timeout_seconds = 4;
+}
+
+message CommandResponse {
+  bool success = 1;
+  string message = 2;
+  int32 command_id = 3;
+  string error = 4;
+}
+
+message BroadcastRequest {
+  string command = 1;
+  map<string, string> parameters = 2;
+  repeated string device_ids = 3; // пустой массив = всем устройствам
+}
+
+message BroadcastResponse {
+  int32 total_devices = 1;
+  int32 successful = 2;
+  int32 failed = 3;
+  map<string, string> errors = 4;
+}
+
+message GetDevicesRequest {
+  bool online_only = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+
+message GetDevicesResponse {
+  repeated DeviceInfo devices = 1;
+  int32 total_count = 2;
+  int32 online_count = 3;
+}
+
+message DeviceInfoRequest {
+  string device_id = 1;
+}
+
+message DeviceInfoResponse {
+  DeviceInfo device = 1;
+  bool found = 2;
+}
+
+message DeviceLogsRequest {
+  string device_id = 1;
+  int32 limit = 2;
+  google.protobuf.Timestamp since = 3;
+}
+
+message DeviceLogEntry {
+  string message = 1;
+  string level = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message DeviceLogsResponse {
+  repeated DeviceLogEntry logs = 1;
+  int32 total_count = 2;
+}
+
+// Internal message types for device communication
+message DeviceInfoData {
+  DeviceInfo device_info = 1;
+  AppInfo app_info = 2;
+  string connectivity = 3;
+}
+
+message AppInfo {
+  string app_name = 1;
+  string package_name = 2;
+  string version = 3;
+  string build_number = 4;
+}
+
+message CommandData {
+  string command = 1;
+  map<string, string> parameters = 2;
+  int32 command_id = 3;
+}
+
+message CommandResultData {
+  string command = 1;
+  string result = 2;
+  string error = 3;
+  int32 command_id = 4;
+  bytes output_data = 5;
+}
+
+message LogsData {
+  repeated string logs = 1;
+}
+
+// Shell session messages
+message ShellStartData {
+  string session_id = 1;
+  string shell_type = 2; // e.g., "bash", "sh", "cmd", "powershell"
+  int32 rows = 3;
+  int32 cols = 4;
+}
+
+message ShellInputData {
+  string session_id = 1;
+  bytes data = 2; // Raw terminal input (can contain control sequences)
+}
+
+message ShellOutputData {
+  string session_id = 1;
+  bytes data = 2; // Raw terminal output (can contain ANSI escape codes)
+}
+
+message ShellResizeData {
+  string session_id = 1;
+  int32 rows = 2;
+  int32 cols = 3;
+}
+
+message ShellExitData {
+  string session_id = 1;
+  int32 exit_code = 2;
+  string reason = 3; // "normal", "timeout", "error", "client_disconnect"
+}
+

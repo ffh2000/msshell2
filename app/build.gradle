@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.protobuf)
 }
 
 android {
@@ -23,28 +24,92 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
     }
+
     kotlinOptions {
         jvmTarget = '11'
+    }
+
+    // Включаем поддержку protobuf
+    sourceSets {
+        main {
+            proto {
+                srcDir 'src/main/proto'
+            }
+        }
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = 'com.google.protobuf:protoc:3.21.12'
+    }
+
+    plugins {
+        grpc {
+            artifact = "io.grpc:protoc-gen-grpc-java:1.63.0"
+        }
+    }
+
+    generateProtoTasks {
+        all().forEach { task ->
+            task.builtins {
+                create("java") {
+                    option("lite")
+                }
+            }
+            task.plugins {
+                create("grpc") {
+                    option("lite")
+                }
+            }
+
+//            task.plugins {
+//                grpc {} // генерируем gRPC код
+//            }
+        }
+    }
+}
+
+// Пост-обработка с заменой аннотаций javax.annotation.Generated на jakarta.annotation.Generated
+tasks.withType(com.google.protobuf.gradle.GenerateProtoTask).configureEach {
+    doLast {
+        def protoJavaDir = "${project.buildDir}/generated/sources/proto"
+        fileTree(protoJavaDir).matching {
+            include "**/*.java"
+        }.forEach { File f ->
+            def text = f.text
+            text = text.replace("javax.annotation.Generated", "jakarta.annotation.Generated")
+            f.text = text
+        }
     }
 }
 
 dependencies {
-
-    implementation libs.androidx.core.ktx
-    implementation libs.androidx.appcompat
-    implementation libs.material
-    implementation libs.androidx.activity
-    implementation libs.androidx.constraintlayout
-    testImplementation libs.junit
-    androidTestImplementation libs.androidx.junit
-    androidTestImplementation libs.androidx.espresso.core
-
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation "androidx.work:work-runtime:2.9.0"
     implementation "androidx.work:work-runtime-ktx:2.9.0"
     implementation 'com.google.code.gson:gson:2.10.1'
+
+    implementation 'io.grpc:grpc-okhttp:1.48.1'  // Клиентская библиотека gRPC с OkHttp
+    implementation 'io.grpc:grpc-protobuf:1.48.1'  // Поддержка Protobuf
+    implementation 'io.grpc:grpc-stub:1.48.1'  // Генерация стубов для взаимодействия
+    implementation 'com.google.protobuf:protobuf-java:3.19.4'  // Библиотека Protobuf для Java
+    // Аннотации для Java 11+ (решает @Generated)
+    implementation 'com.google.code.findbugs:jsr305:3.0.2'
+    implementation "jakarta.annotation:jakarta.annotation-api:2.1.1"
+
+    //    implementation libs.androidx.core.ktx
+    implementation libs.androidx.appcompat
+    implementation libs.material
+    implementation libs.androidx.activity
+
+    implementation libs.androidx.constraintlayout
+    testImplementation libs.junit
+    androidTestImplementation libs.androidx.junit
+    androidTestImplementation libs.androidx.espresso.core
 }
