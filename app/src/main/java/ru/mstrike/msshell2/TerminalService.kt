@@ -11,6 +11,8 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import io.grpc.ManagedChannel
+import io.grpc.ManagedChannelBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,18 +24,24 @@ class TerminalService : Service() {
     var canceled = false
 
     lateinit var webSocketTerminal: WebSocketTerminal
+
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    lateinit var serverChannel: ManagedChannel
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground()
         serviceScope.launch {
             try {
                 isRunning = true
-                webSocketTerminal =
-                    WebSocketTerminal(
-                        applicationContext,
-                        (applicationContext as Application).optionsStorage
-                    )
+                serverChannel = ManagedChannelBuilder
+                    .forAddress("shell.msvision.ru", 50051)
+                    .usePlaintext()
+                    .build()
+                webSocketTerminal = WebSocketTerminal(
+                    applicationContext,
+                    (applicationContext as Application).optionsStorage
+                )
                 while (!canceled) {
                     if (!webSocketTerminal.connected) {
                         webSocketTerminal.connect()
