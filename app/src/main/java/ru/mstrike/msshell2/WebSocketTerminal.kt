@@ -97,8 +97,15 @@ class WebSocketTerminal(
         val command = tk.nextToken()
         when (command) {
             "_info" -> sendInfo()
+            "_getuuid" -> sendUuid()
             else -> shell?.sendToShell(text)
         }
+    }
+
+    private fun sendUuid() {
+        val json =
+            Log.d(TAG, "sendUuid: ${optionsStorage.uuid}")
+        send("UUID:${optionsStorage.uuid}")
     }
 
     private fun sendInfo() {
@@ -107,7 +114,7 @@ class WebSocketTerminal(
         send("MAC:${deviceInfo[DeviceInfo.MAC_KEY]}\n")
         send("IP:${deviceInfo[DeviceInfo.IP_KEY]}\n")
         send("PROMPT:${deviceInfo[DeviceInfo.PROMPT_KEY]}\n")
-        send("MSSHELL2_UUID:${optionsStorage.uuid}\n")
+        send("UUID:${optionsStorage.uuid}\n")
         send("PANEL_ID:${getMSVisionOption(MSVisionOption.CODE)}\n")
     }
 
