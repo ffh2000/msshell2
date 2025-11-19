@@ -4,15 +4,14 @@ import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import com.google.protobuf.ByteString
 import com.google.protobuf.timestamp
-import device.DeviceServiceGrpc
-import device_v1.DeviceProto.*
-import device_v1.DeviceServiceGrpcKt
+import device.Device.*
 import io.grpc.ManagedChannel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
 import org.json.JSONObject
-import timber.log.Timber
 import java.net.InetAddress
 import java.net.NetworkInterface
 
@@ -20,11 +19,13 @@ class DeviceRepository(
     private val context: Context,
     private val deviceId: String
 ) {
-    private lateinit var stub: DeviceServiceGrpc.DeviceServiceCoroutineStub
-    private lateinit var stream: io.grpc.stub.ClientCalls.ClientBidiStreamingCall<DeviceMessage, DeviceMessage>
+    private lateinit var stub: device.DeviceServiceGrpcKt.DeviceServiceCoroutineStub
+//    private lateinit var stream: io.grpc.stub.ClientCalls.ClientBidiStreamingCall<DeviceMessage, DeviceMessage>
+    private lateinit var requestChannel: SendChannel<DeviceMessage>
+    private lateinit var responseFlow: Flow<DeviceMessage>
 
     fun initialize(channel: ManagedChannel) {
-        stub = DeviceServiceGrpcKt.DeviceServiceCoroutineStub(channel)
+        stub = device.DeviceServiceGrpcKt.DeviceServiceCoroutineStub(channel)
     }
 
     suspend fun startStream(): Flow<DeviceMessage> {
@@ -36,17 +37,17 @@ class DeviceRepository(
         val deviceInfo = buildDeviceInfo()
         val macAddress = getMacAddress()
 
-        val message = DeviceMessage.newBuilder()
+        val message = Device.DeviceMessage.newBuilder()
             .setMessageId("info-${System.nanoTime()}")
             .setDeviceId(deviceId)
             .setMacAddress(macAddress)  // REQUIRED: MAC as primary identifier
-            .setType(MessageType.DEVICE_INFO)
+            .setType(Device.MessageType.DEVICE_INFO)
             .setData(ByteString.copyFromUtf8(deviceInfo))
             .setTimestamp(timestamp { seconds = System.currentTimeMillis() / 1000 })
             .build()
 
         stream.send(message)
-        Timber.d("Sent device info with MAC: $macAddress")
+        Log.d(this.javaClass.name, "Sent device info with MAC: $macAddress")
     }
 
     suspend fun sendPing() {
@@ -140,7 +141,8 @@ class DeviceRepository(
         try {
             // Attempt 1: WiFi Manager (Android 6-9)
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                val wifiManager =
+                    context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
                 val wifiInfo = wifiManager?.connectionInfo
                 val macAddr = wifiInfo?.macAddress
                 if (!macAddr.isNullOrEmpty() && macAddr != "02:00:00:00:00:00") {
@@ -171,7 +173,7 @@ class DeviceRepository(
                 return "02:" + androidId.take(10).chunked(2).joinToString(":")
             }
         } catch (e: Exception) {
-            Timber.e(e, "Failed to get MAC address")
+            Log.e(this.javaClass.name, "Failed to get MAC address")
         }
 
         // Final fallback: generate device-specific identifier
@@ -196,7 +198,7 @@ class DeviceRepository(
                 }
             }
         } catch (e: Exception) {
-            Timber.e(e, "Failed to get IP address")
+            Log.e(this.javaClass.name, "Failed to get IP address")
         }
         return "unknown"
     }
