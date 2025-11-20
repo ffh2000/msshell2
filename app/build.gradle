@@ -30,6 +30,11 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
 
+    packagingOptions {
+        exclude 'google/protobuf/field_mask.proto'
+        exclude 'google/protobuf/descriptor.proto'
+    }
+
     kotlinOptions {
         jvmTarget = '11'
     }
@@ -41,6 +46,11 @@ android {
                 srcDir 'src/main/proto'
             }
         }
+    }
+    packagingOptions {
+        exclude 'google/protobuf/field_mask.proto'
+        exclude 'google/protobuf/descriptor.proto'
+        exclude 'google/protobuf/any.proto'
     }
 }
 
@@ -60,6 +70,11 @@ protobuf {
 
     generateProtoTasks {
         all().forEach { task ->
+            // Добавляем include path для well-known types
+            task.protoPath {
+                srcDir "src/main/proto"
+                srcDir "${project.buildDir}/protobuf/src/main/proto" // иногда нужно
+            }
             task.builtins {
                 create("java") {
                     option("lite")
@@ -76,10 +91,6 @@ protobuf {
                     option("lite")  // gRPC Kotlin lite
                 }
             }
-
-//            task.plugins {
-//                grpc {} // генерируем gRPC код
-//            }
         }
     }
 }
@@ -98,6 +109,14 @@ tasks.withType(com.google.protobuf.gradle.GenerateProtoTask).configureEach {
     }
 }
 
+configurations.all {
+    resolutionStrategy {
+        force 'com.google.protobuf:protobuf-javalite:3.25.8'
+        // Для исключения конкретных версий
+        exclude module: 'protobuf-java'
+    }
+}
+
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation "androidx.work:work-runtime:2.9.0"
@@ -105,9 +124,13 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
 
     implementation 'io.grpc:grpc-okhttp:1.77.0'  // Клиентская библиотека gRPC с OkHttp
-    implementation 'io.grpc:grpc-protobuf:1.77.0'  // Поддержка Protobuf
+//    implementation 'io.grpc:grpc-protobuf:1.77.0'  // Поддержка Protobuf
+//    implementation 'io.grpc:grpc-protobuf-lite:1.77.0'  // gRPC Protobuf Lite
+    // Lite runtime
     implementation 'io.grpc:grpc-stub:1.77.0'  // Генерация стубов для взаимодействия
-    implementation 'com.google.protobuf:protobuf-java:3.19.4'  // Библиотека Protobuf для Java
+//    implementation 'com.google.protobuf:protobuf-java:3.19.4'  // Библиотека Protobuf для Java
+//    implementation 'com.google.protobuf:protobuf-lite:3.19.4'   // Протокол Lite
+//    implementation "com.google.protobuf:protobuf-javalite:3.25.3"
     // Аннотации для Java 11+ (решает @Generated)
     implementation 'com.google.code.findbugs:jsr305:3.0.2'
     implementation "jakarta.annotation:jakarta.annotation-api:2.1.1"
@@ -116,7 +139,7 @@ dependencies {
     implementation("io.grpc:grpc-kotlin-stub:1.3.0")
 
     // Protobuf
-    implementation("com.google.protobuf:protobuf-kotlin:3.24.4")
+    implementation("com.google.protobuf:protobuf-kotlin:3.25.8")
 
 
     //    implementation libs.androidx.core.ktx

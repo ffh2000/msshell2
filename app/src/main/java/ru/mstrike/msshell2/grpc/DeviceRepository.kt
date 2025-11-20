@@ -8,9 +8,12 @@ import android.util.Log
 import com.google.protobuf.ByteString
 import com.google.protobuf.timestamp
 import device.Device.*
+import device.DeviceServiceGrpcKt
 import io.grpc.ManagedChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import org.json.JSONObject
 import java.net.InetAddress
 import java.net.NetworkInterface
@@ -20,7 +23,8 @@ class DeviceRepository(
     private val deviceId: String
 ) {
     private lateinit var stub: device.DeviceServiceGrpcKt.DeviceServiceCoroutineStub
-//    private lateinit var stream: io.grpc.stub.ClientCalls.ClientBidiStreamingCall<DeviceMessage, DeviceMessage>
+
+    //    private lateinit var stream: io.grpc.stub.ClientCalls.ClientBidiStreamingCall<DeviceMessage, DeviceMessage>
     private lateinit var requestChannel: SendChannel<DeviceMessage>
     private lateinit var responseFlow: Flow<DeviceMessage>
 
@@ -29,24 +33,29 @@ class DeviceRepository(
     }
 
     suspend fun startStream(): Flow<DeviceMessage> {
-        stream = stub.deviceStream()
-        return stream.inbound
+        val requestStream = kotlinx.coroutines.channels.Channel<DeviceMessage>() // Создаем канал для запросов
+        val responseFlow = stub.deviceStream(requestStream.receiveAsFlow()) // Передаем канал запросов в deviceStream
+
+        // Для отправки сообщений через requestStream:
+        requestChannel = requestStream
+
+        return responseFlow // Этот Flow будет обрабатывать ответы от сервера
     }
 
     suspend fun sendDeviceInfo() {
         val deviceInfo = buildDeviceInfo()
         val macAddress = getMacAddress()
 
-        val message = Device.DeviceMessage.newBuilder()
+        val message = DeviceMessage.newBuilder()
             .setMessageId("info-${System.nanoTime()}")
             .setDeviceId(deviceId)
             .setMacAddress(macAddress)  // REQUIRED: MAC as primary identifier
-            .setType(Device.MessageType.DEVICE_INFO)
+            .setType(MessageType.DEVICE_INFO)
             .setData(ByteString.copyFromUtf8(deviceInfo))
             .setTimestamp(timestamp { seconds = System.currentTimeMillis() / 1000 })
             .build()
 
-        stream.send(message)
+        requestChannel.send(message)
         Log.d(this.javaClass.name, "Sent device info with MAC: $macAddress")
     }
 
@@ -58,7 +67,7 @@ class DeviceRepository(
             .setTimestamp(timestamp { seconds = System.currentTimeMillis() / 1000 })
             .build()
 
-        stream.send(message)
+        requestChannel.send(message)
     }
 
     suspend fun sendShellOutput(sessionId: String, data: ByteArray) {
@@ -76,7 +85,7 @@ class DeviceRepository(
             .setTimestamp(timestamp { seconds = System.currentTimeMillis() / 1000 })
             .build()
 
-        stream.send(message)
+        requestChannel.send(message)
     }
 
     suspend fun sendShellExit(sessionId: String, exitCode: Int) {
@@ -94,7 +103,7 @@ class DeviceRepository(
             .setTimestamp(timestamp { seconds = System.currentTimeMillis() / 1000 })
             .build()
 
-        stream.send(message)
+        requestChannel.send(message)
     }
 
     suspend fun sendCommandResult(commandId: Int, command: String, result: String) {
@@ -113,7 +122,7 @@ class DeviceRepository(
             .setTimestamp(timestamp { seconds = System.currentTimeMillis() / 1000 })
             .build()
 
-        stream.send(message)
+        requestChannel.send(message)
     }
 
     private fun buildDeviceInfo(): String {
